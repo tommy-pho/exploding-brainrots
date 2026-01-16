@@ -1,39 +1,47 @@
 -- Module For Managing GameTables
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local models = ReplicatedStorage:WaitForChild("Models")
+local ServerStorage = game:GetService("ServerStorage")
+local models = ServerStorage:WaitForChild("Models")
 local tables = models:WaitForChild("Tables")
 local chairs = models:WaitForChild("Chairs")
-local defaultSignText = "0/2 Players"
-local defaultMoneyTest = "Win $300"
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Configs = require(ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild("Configs"))
+local GameTableConfig = Configs.GameTable
 
 local GameTable = {}
 GameTable.__index = GameTable
 
-function GameTable.new(position:Vector3)
+function GameTable.new(position:Vector2)
 	local self = setmetatable({}, GameTable)
 
-	self.table = tables:FindFirstChild("Default"):Clone()
-	self.table.Position = position
+	local table = tables:FindFirstChild("Default"):Clone()
+	local playerOneChair = chairs:FindFirstChild('Default'):Clone()
+	local playerTwoChair = chairs:FindFirstChild('Default'):Clone()
 
-	self.chairs = {}
-	local player_one_chair = chairs:FindFirstChild('Default'):Clone()
-	local player_two_chair = chairs:FindFirstChild('Default'):Clone()
-	-- self.chairs.Position = position + Vector3.new(0,0,5)
-	self.chairs.insert(player_one_chair)
-	self.chairs.insert(player_two_chair)
+	table:PivotTo(CFrame.new(Vector3.new(position.X, GameTableConfig.TableHeight, position.Y)))
+	local tablePosition = table:GetPivot().Position
+	playerOneChair:PivotTo(CFrame.new(Vector3.new(tablePosition.X + GameTableConfig.ChairOffsetX, GameTableConfig.ChairHeight, tablePosition.Z + GameTableConfig.ChairOffsetZ)))
+	playerTwoChair:PivotTo(CFrame.new(Vector3.new(tablePosition.X - GameTableConfig.ChairOffsetX, GameTableConfig.ChairHeight, tablePosition.Z + GameTableConfig.ChairOffsetZ)))
+	
+	local rotationCFrame = CFrame.Angles(0, math.rad(GameTableConfig.ChairRotY), 0)  -- e.g., angleDeg = 45 for 45°
+	local fullCFrame = CFrame.new(playerOneChair:GetPivot().Position) * rotationCFrame  -- Position * Rotation
+	playerOneChair:PivotTo(fullCFrame)
 
-	-- Set Up Ui Signs on the Tables
-	-- create parts for signs
+	local rotationCFrame = CFrame.Angles(0, math.rad(GameTableConfig.ChairRotY), 0)  -- e.g., angleDeg = 45 for 45°
+	local fullCFrame = CFrame.new(playerTwoChair:GetPivot().Position) * rotationCFrame  -- Position * Rotation
+	playerTwoChair:PivotTo(fullCFrame)
 
+	local tableChairs = {playerOneChair, playerTwoChair}
 
-	self.table.Parent = workspace
-	for _, chair in pairs(self.chairs) do
+	-- TODO: Set Up Ui Signs on the Tables
+	-- TODO: create parts for signs
+
+	table.Parent = workspace
+	for _, chair in pairs(tableChairs) do
 		chair.Parent = workspace
 	end
-	
 	return self
 end
-
 
 function GameTable:Is_Ready()
 	-- Check if the table is ready for a game

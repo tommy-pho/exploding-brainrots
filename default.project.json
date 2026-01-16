@@ -7,17 +7,27 @@
       "Shared": {
         "$path": "src/shared"
       },
-      "Modules": {
-        "$path": "src/Modules"
+      "SharedModules": {
+        "$path": "src/SharedModules"
       },
-      "Models": {
-        "$path": "src/Models"
+      "SharedModels": {
+        "$path": "src/SharedModels"
       }
     },
 
     "ServerScriptService": {
       "Server": {
         "$path": "src/server"
+      },
+      
+      "Modules": {
+        "$path": "src/Modules"
+      }
+    },
+
+    "ServerStorage": {
+      "Models": {
+        "$path": "src/Models"
       }
     },
 
