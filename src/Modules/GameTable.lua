@@ -1,4 +1,5 @@
 -- Module For Managing GameTables
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ServerStorage = game:GetService("ServerStorage")
 local models = ServerStorage:WaitForChild("Models")
 local tables = models:WaitForChild("Tables")
@@ -35,12 +36,18 @@ function GameTable.new(position:Vector2)
 	
 	playerOneChair:WaitForChild("Seat").Disabled = true
 	playerTwoChair:WaitForChild("Seat").Disabled = true
+	local chairPrompts = {}
 
 	local ProximityPrompt = Instance.new("ProximityPrompt")
 	ProximityPrompt.RequiresLineOfSight = false
 	ProximityPrompt.ActionText = "Play Game"
 	ProximityPrompt.ObjectText = "Join"
 	ProximityPrompt.HoldDuration = 1.0
+	ProximityPrompt.MaxActivationDistance = 10
+	ProximityPrompt.Triggered:Connect(function(player)
+		self:ChairPromptCallback(player, 1)
+	end)
+	chairPrompts[#chairPrompts+1] = ProximityPrompt
 	ProximityPrompt.Parent = playerOneChair:WaitForChild("Seat")
 
 	local ProximityPrompt = Instance.new("ProximityPrompt")
@@ -48,12 +55,15 @@ function GameTable.new(position:Vector2)
 	ProximityPrompt.ActionText = "Play Game"
 	ProximityPrompt.ObjectText = "Join"
 	ProximityPrompt.HoldDuration = 1.0
+	ProximityPrompt.MaxActivationDistance = 10
+	ProximityPrompt.Triggered:Connect(function(player)
+		self:ChairPromptCallback(player, 2)
+	end)
+	chairPrompts[#chairPrompts+1] = ProximityPrompt
 	ProximityPrompt.Parent = playerTwoChair:WaitForChild("Seat")
 
 	local tableChairs = {playerOneChair, playerTwoChair}
 
-	-- TODO: Set Up Ui Signs on the Tables
-	-- TODO: create parts for signs
 	local tableTop = table:FindFirstChild("tableTop")
 	local billboardGui = Instance.new("BillboardGui")
 	billboardGui.Name = "TableSign"
@@ -62,7 +72,6 @@ function GameTable.new(position:Vector2)
 	billboardGui.MaxDistance = 100
 	billboardGui.Parent = tableTop
 
-	
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, 0, 0.2, 0)
 	textLabel.Position = UDim2.new(0, 0, 0.15, 0)
@@ -74,6 +83,7 @@ function GameTable.new(position:Vector2)
 	textLabel.FontFace = Font.fromName("FredokaOne",  Enum.FontWeight.Medium, Enum.FontStyle.Normal)
 	textLabel.Name = "PlayerSign"
 	textLabel.Parent = billboardGui
+	self.playerSign = textLabel
 
 	textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, 0, 0.3, 0)
@@ -91,12 +101,42 @@ function GameTable.new(position:Vector2)
 	for _, chair in pairs(tableChairs) do
 		chair.Parent = workspace
 	end
+
+	self.numPlayers = 0
+	self.tableChairs = tableChairs
+	self.chairPrompts = chairPrompts
 	return self
 end
 
-function GameTable:Is_Ready()
-	-- Check if the table is ready for a game
-	return false
+function GameTable:ChairPromptCallback(player:Player, chairNumber:number)
+	-- TODOL : Add checks to prevent joining if already seated or game in progress
+
+	print(player.Name .. " wants to join the game on chair " .. chairNumber)
+	self.numPlayers = self.numPlayers + 1
+	self.playerSign.Text = tostring(self.numPlayers) .. "/2 Players"
+	self.chairPrompts[chairNumber].Enabled = false
+
+	local Seat = self.tableChairs[chairNumber]:WaitForChild("Seat")
+	local character = player.Character or player.CharacterAdded:Wait()
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	humanoid.JumpHeight = 0  -- Disable jumping
+	humanoid.JumpPower = 0  -- Disable jumping
+	Seat:Sit(humanoid)
+
+	-- Make the ui visible
+	player:WaitForChild("PlayerGui"):WaitForChild("ScreenGui"):WaitForChild("LeaveFrame").Visible = true
+
+	if self.numPlayers >= 2 then
+		-- Reset player count after both players have joined
+		-- self.numPlayers = 0
+		-- TODO: Make Gui Appear for both players
+		-- TODO: Start Counting Down to Start Game
+		for i = 5, 0, -1 do
+			self.playerSign.Text = "Game starting in "..i.." seconds"
+			task.wait(1)
+		self.playerSign.Text = ""
+end
+	end
 end 
 
 return GameTable
