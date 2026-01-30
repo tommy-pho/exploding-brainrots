@@ -1,12 +1,11 @@
 -- Module For Managing GameTables
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local ServerStorage = game:GetService("ServerStorage")
 local models = ServerStorage:WaitForChild("Models")
 local tables = models:WaitForChild("Tables")
 local chairs = models:WaitForChild("Chairs")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TextService = game:GetService("TextService")
+local ShowLeaveFrame = ReplicatedStorage:WaitForChild("ShowLeaveFrame")
 local Configs = require(ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild("Configs"))
 local GameTableConfig = Configs.GameTable
 
@@ -15,7 +14,10 @@ GameTable.__index = GameTable
 
 function GameTable.new(position:Vector2)
 	local self = setmetatable({}, GameTable)
+	self.numPlayers = 0
+	self.isCountingDown = false
 
+	-- Setting up Table and Chairs --
 	local table = tables:FindFirstChild("Default"):Clone()
 	local playerOneChair = chairs:FindFirstChild('Default'):Clone()
 	local playerTwoChair = chairs:FindFirstChild('Default'):Clone()
@@ -33,16 +35,17 @@ function GameTable.new(position:Vector2)
 	local fullCFrame = CFrame.new(playerTwoChair:GetPivot().Position) * rotationCFrame  -- Position * Rotation
 	playerTwoChair:PivotTo(fullCFrame)
 
-	
+	-- Disabling Seats initially --
 	playerOneChair:WaitForChild("Seat").Disabled = true
 	playerTwoChair:WaitForChild("Seat").Disabled = true
 	local chairPrompts = {}
 
+	-- Setting up Proximity Prompts For Chairs --
 	local ProximityPrompt = Instance.new("ProximityPrompt")
 	ProximityPrompt.RequiresLineOfSight = false
 	ProximityPrompt.ActionText = "Play Game"
 	ProximityPrompt.ObjectText = "Join"
-	ProximityPrompt.HoldDuration = 1.0
+	ProximityPrompt.HoldDuration = 1.5
 	ProximityPrompt.MaxActivationDistance = 10
 	ProximityPrompt.Triggered:Connect(function(player)
 		self:ChairPromptCallback(player, 1)
@@ -54,7 +57,7 @@ function GameTable.new(position:Vector2)
 	ProximityPrompt.RequiresLineOfSight = false
 	ProximityPrompt.ActionText = "Play Game"
 	ProximityPrompt.ObjectText = "Join"
-	ProximityPrompt.HoldDuration = 1.0
+	ProximityPrompt.HoldDuration = 1.5
 	ProximityPrompt.MaxActivationDistance = 10
 	ProximityPrompt.Triggered:Connect(function(player)
 		self:ChairPromptCallback(player, 2)
@@ -63,7 +66,32 @@ function GameTable.new(position:Vector2)
 	ProximityPrompt.Parent = playerTwoChair:WaitForChild("Seat")
 
 	local tableChairs = {playerOneChair, playerTwoChair}
+	self.tableChairs = tableChairs
+	self.chairPrompts = chairPrompts
 
+	-- Setting up Seat Occupant Changed Callbacks --
+	for chairNumber, chair in pairs(tableChairs) do
+		local seat = chair:WaitForChild("Seat")
+		seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+			if not seat.Occupant then
+				-- A player has left the seat
+				self.numPlayers = self.numPlayers - 1
+				self.playerSign.Text = tostring(self.numPlayers) .. "/2 Players"
+				self.winMoneySign.Text = GameTableConfig.DefaultMoneyText
+				self.chairPrompts[chairNumber].Enabled = true
+			else
+				self.numPlayers = self.numPlayers + 1
+				self.playerSign.Text = tostring(self.numPlayers) .. "/2 Players"
+				self.chairPrompts[chairNumber].Enabled = false
+				local occupantHumanoid = seat.Occupant
+				local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
+				ShowLeaveFrame:FireClient(player) -- Make the leave button visible for the player
+				self:CheckAndStartCountdown()
+			end
+		end)
+	end
+
+	-- Setting up Billboard Gui for Table --
 	local tableTop = table:FindFirstChild("tableTop")
 	local billboardGui = Instance.new("BillboardGui")
 	billboardGui.Name = "TableSign"
@@ -96,47 +124,59 @@ function GameTable.new(position:Vector2)
 	textLabel.FontFace = Font.fromName("FredokaOne",  Enum.FontWeight.Medium, Enum.FontStyle.Normal)
 	textLabel.Name = "MoneySign"
 	textLabel.Parent = billboardGui
+	self.winMoneySign = textLabel
 
+	-- Parenting Table and Chairs to Workspace --
 	table.Parent = workspace
 	for _, chair in pairs(tableChairs) do
 		chair.Parent = workspace
 	end
 
-	self.numPlayers = 0
-	self.tableChairs = tableChairs
-	self.chairPrompts = chairPrompts
 	return self
 end
 
 function GameTable:ChairPromptCallback(player:Player, chairNumber:number)
-	-- TODOL : Add checks to prevent joining if already seated or game in progress
 
-	print(player.Name .. " wants to join the game on chair " .. chairNumber)
-	self.numPlayers = self.numPlayers + 1
-	self.playerSign.Text = tostring(self.numPlayers) .. "/2 Players"
-	self.chairPrompts[chairNumber].Enabled = false
-
-	local Seat = self.tableChairs[chairNumber]:WaitForChild("Seat")
 	local character = player.Character or player.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid.Sit then
+		print(player.Name .. " is already seated.")
+		return
+	end
+
+	local Seat = self.tableChairs[chairNumber]:WaitForChild("Seat")
 	humanoid.JumpHeight = 0  -- Disable jumping
 	humanoid.JumpPower = 0  -- Disable jumping
-	Seat:Sit(humanoid)
-
-	-- Make the ui visible
-	player:WaitForChild("PlayerGui"):WaitForChild("ScreenGui"):WaitForChild("LeaveFrame").Visible = true
-
-	if self.numPlayers >= 2 then
-		-- Reset player count after both players have joined
-		-- self.numPlayers = 0
-		-- TODO: Make Gui Appear for both players
-		-- TODO: Start Counting Down to Start Game
-		for i = 5, 0, -1 do
-			self.playerSign.Text = "Game starting in "..i.." seconds"
-			task.wait(1)
-		self.playerSign.Text = ""
+	Seat:Sit(humanoid) -- Make the player sit in the seat
 end
-	end
-end 
+
+function GameTable:CheckAndStartCountdown()
+	local requiredPlayers = 2
+	print("Current Players: " .. self.numPlayers .. "/" .. requiredPlayers)
+    if self.numPlayers >= requiredPlayers and not self.isCountingDown then
+        self.isCountingDown = true
+
+        for i = 5, 0, -1 do
+            if self.numPlayers < requiredPlayers then
+                print("Countdown aborted - player left!")
+                self.isCountingDown = false
+                self.playerSign.Text = tostring(self.numPlayers) .. "/2 Players"
+                return 
+            end
+
+            self.playerSign.Text = "Game starting in " .. i .. " seconds"
+            task.wait(1)
+        end
+
+        -- Countdown finished → start the actual game!
+        self.playerSign.Text = ""
+		self.winMoneySign.Text = ""
+        -- TODO: Your game logic here (deal cards, start round, etc.)
+        -- e.g. self:StartGame()
+
+        self.isCountingDown = false
+		
+    end
+end
 
 return GameTable

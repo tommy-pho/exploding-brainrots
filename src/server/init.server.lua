@@ -1,3 +1,24 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+
+-- Creating RemoteEvents --
+local ShowLeaveFrame = Instance.new("RemoteEvent")
+ShowLeaveFrame.Name = "ShowLeaveFrame"
+ShowLeaveFrame.Parent = ReplicatedStorage
+
+
+-- CallBacks for RemoteEvents --
+ShowLeaveFrame.OnServerEvent:Connect(function(player)
+    local character = player.Character or player.CharacterAdded:Wait()
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid.Sit then
+        humanoid.Sit = false
+        humanoid.JumpHeight = StarterPlayer.CharacterJumpHeight 
+        humanoid.JumpPower = StarterPlayer.CharacterJumpPower
+    end
+end)
+
+-- Setting up Game Tables --
 local GameTable = require(game.ServerScriptService:WaitForChild("Modules"):WaitForChild("GameTable"))
 NUM_ROWS = 3
 NUM_COLS = 5
