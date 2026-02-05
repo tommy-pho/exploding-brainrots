@@ -6,6 +6,7 @@ local chairs = models:WaitForChild("Chairs")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ShowLeaveFrame = ReplicatedStorage:WaitForChild("ShowLeaveFrame")
+local ShowInitCamView = ReplicatedStorage:WaitForChild("ShowInitCamView")
 local Configs = require(ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild("Configs"))
 local GameTableConfig = Configs.GameTable
 
@@ -126,7 +127,11 @@ function GameTable.new(position:Vector2)
 	textLabel.Parent = billboardGui
 	self.winMoneySign = textLabel
 
+	-- Adding Squares on Table Top --
+
+	
 	-- Parenting Table and Chairs to Workspace --
+	self.table = table
 	table.Parent = workspace
 	for _, chair in pairs(tableChairs) do
 		chair.Parent = workspace
@@ -150,8 +155,27 @@ function GameTable:ChairPromptCallback(player:Player, chairNumber:number)
 	Seat:Sit(humanoid) -- Make the player sit in the seat
 end
 
+
+function GameTable:GetChairCameraCFrame(chairNum)
+    local chair = self.tableChairs[chairNum]
+    local seatPos = chair.Seat.Position
+    return CFrame.lookAt(
+        seatPos + Vector3.new(0, 2, 5),  -- Cam pos (behind/up)
+        seatPos + Vector3.new(0, 1, 0)   -- Look at seat center
+    )
+end
+
+function GameTable:GetTableCameraCFrame()
+    local table = self.table
+	local tablePos = table.tableTop.Position
+	return CFrame.lookAt(
+		tablePos + Vector3.new(0, 5, -5),  -- Cam pos (above)
+		tablePos                          -- Look at table center
+	)
+end
+
 function GameTable:CheckAndStartCountdown()
-	local requiredPlayers = 2
+	local requiredPlayers = 1
 	print("Current Players: " .. self.numPlayers .. "/" .. requiredPlayers)
     if self.numPlayers >= requiredPlayers and not self.isCountingDown then
         self.isCountingDown = true
@@ -173,6 +197,33 @@ function GameTable:CheckAndStartCountdown()
 		self.winMoneySign.Text = ""
         -- TODO: Your game logic here (deal cards, start round, etc.)
         -- e.g. self:StartGame()
+
+		local players = {}
+		for chairNumber, chair in pairs(self.tableChairs) do
+			local seat = chair:WaitForChild("Seat")
+			if seat.Occupant ~= nil then
+				local occupantHumanoid = seat.Occupant
+				local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
+				table.insert(players, player)
+			end
+
+		end
+
+		if #players < requiredPlayers then
+			print("Not enough players to start the game.")
+			self.isCountingDown = false
+			return
+		end
+
+		for i = 1, requiredPlayers do
+			local camCFrame = self:GetTableCameraCFrame()
+			ShowInitCamView:FireClient(players[i], camCFrame)  -- set cam for ith player
+		end
+		
+		-- drop the food on server
+
+		-- wait until all food has been dropped then fireclient to set cam to different view 
+
 
         self.isCountingDown = false
 		

@@ -6,6 +6,10 @@ local ShowLeaveFrame = Instance.new("RemoteEvent")
 ShowLeaveFrame.Name = "ShowLeaveFrame"
 ShowLeaveFrame.Parent = ReplicatedStorage
 
+local ShowInitCamView = Instance.new("RemoteEvent")
+ShowInitCamView.Name = "ShowInitCamView"
+ShowInitCamView.Parent = ReplicatedStorage
+
 
 -- CallBacks for RemoteEvents --
 ShowLeaveFrame.OnServerEvent:Connect(function(player)

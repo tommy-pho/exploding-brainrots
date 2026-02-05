@@ -7,7 +7,9 @@ local Config = {
         ChairOffsetZ = 3.6, -- distance of chairs from the table center'
         ChairRotY = -90, -- rotation of chairs in degrees about the vertical Y axis
         DefaultSignText = "0/2 Players",
-        DefaultMoneyText = "Win $300"
+        DefaultMoneyText = "Win $300",
+        NumSquaresX = 3,
+        NumSquaresZ = 6,
 	}
 }
 
