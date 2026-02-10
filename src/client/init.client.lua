@@ -21,6 +21,7 @@ leaveFrame.Visible = false
 leaveButton.Activated:Connect(function()
     leaveFrame.Visible = false
     ShowLeaveFrame:FireServer()
+    camera.CameraType = Enum.CameraType.Custom
 end)
 
 ShowLeaveFrame.OnClientEvent:Connect(function()

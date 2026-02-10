@@ -127,9 +127,35 @@ function GameTable.new(position:Vector2)
 	textLabel.Parent = billboardGui
 	self.winMoneySign = textLabel
 
-	-- Adding Squares on Table Top --
+	-- Adding Squares on Top of Table --
+	local squareSpacing = 0.1
+	local sqauresizeX = 0.85 * (table.tableTop.Size.X - squareSpacing * (GameTableConfig.NumSquaresX - 1)) / GameTableConfig.NumSquaresX
+	local sqauresizeZ = 0.90 * (table.tableTop.Size.Z - squareSpacing * (GameTableConfig.NumSquaresZ - 1)) / GameTableConfig.NumSquaresZ
+	local squareSize = math.min(sqauresizeX, sqauresizeZ)
+	for i = 0, GameTableConfig.NumSquaresX - 1 do
+		for j = 0, GameTableConfig.NumSquaresZ - 1 do
+			local squarePart = Instance.new("Part")
+			squarePart.Size = Vector3.new(squareSize, 0.1, squareSize)
+			squarePart.Anchored = true
+			squarePart.CanCollide = false
+			squarePart.Transparency = 0
+			squarePart.CastShadow = false
+			squarePart.Material = Enum.Material.SmoothPlastic
+			squarePart.Position = table.tableTop.Position + Vector3.new(
+				(-GameTableConfig.NumSquaresX / 2 + 0.5 + i) * squareSize + (i - (GameTableConfig.NumSquaresX - 1) / 2) * squareSpacing,
+				0.1,
+				(-GameTableConfig.NumSquaresZ / 2 + 0.5 + j) * squareSize + (j - (GameTableConfig.NumSquaresZ - 1) / 2) * squareSpacing
+			)
+			if i < GameTableConfig.NumSquaresX / 2 then
+				squarePart.Color = Color3.new(1, 0.349, 0.349) -- color for player 1 side
+			else
+				squarePart.Color = Color3.new(0.0157, 0.686, 0.925) -- color for player 2 side
+			end
+			squarePart.Parent = table
+		end
+	end
 
-	
+
 	-- Parenting Table and Chairs to Workspace --
 	self.table = table
 	table.Parent = workspace

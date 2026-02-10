@@ -8,8 +8,8 @@ local Config = {
         ChairRotY = -90, -- rotation of chairs in degrees about the vertical Y axis
         DefaultSignText = "0/2 Players",
         DefaultMoneyText = "Win $300",
-        NumSquaresX = 3,
-        NumSquaresZ = 6,
+        NumSquaresX = 6,
+        NumSquaresZ = 3,
 	}
 }
 
