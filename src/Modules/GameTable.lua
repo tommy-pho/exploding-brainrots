@@ -10,6 +10,9 @@ local ShowInitCamView = ReplicatedStorage:WaitForChild("ShowInitCamView")
 local Configs = require(ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild("Configs"))
 local GameTableConfig = Configs.GameTable
 
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(2, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+
 local GameTable = {}
 GameTable.__index = GameTable
 
@@ -86,7 +89,7 @@ function GameTable.new(position:Vector2)
 				self.chairPrompts[chairNumber].Enabled = false
 				local occupantHumanoid = seat.Occupant
 				local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
-				ShowLeaveFrame:FireClient(player) -- Make the leave button visible for the player
+				ShowLeaveFrame:FireClient(player, true) -- Make the leave button visible for the player
 				self:CheckAndStartCountdown()
 			end
 		end)
@@ -129,9 +132,12 @@ function GameTable.new(position:Vector2)
 
 	-- Adding Squares on Top of Table --
 	local squareSpacing = 0.1
-	local sqauresizeX = 0.85 * (table.tableTop.Size.X - squareSpacing * (GameTableConfig.NumSquaresX - 1)) / GameTableConfig.NumSquaresX
-	local sqauresizeZ = 0.90 * (table.tableTop.Size.Z - squareSpacing * (GameTableConfig.NumSquaresZ - 1)) / GameTableConfig.NumSquaresZ
-	local squareSize = math.min(sqauresizeX, sqauresizeZ)
+	local squaresizeX = 0.85 * (table.tableTop.Size.X - squareSpacing * (GameTableConfig.NumSquaresX - 1)) / GameTableConfig.NumSquaresX
+	local squaresizeZ = 0.90 * (table.tableTop.Size.Z - squareSpacing * (GameTableConfig.NumSquaresZ - 1)) / GameTableConfig.NumSquaresZ
+	local squareSize = math.min(squaresizeX, squaresizeZ)
+	local playerOneSquares = {}
+	local playerTwoSquares = {}
+	-- TODO: make sure the y position 0.1 is correct
 	for i = 0, GameTableConfig.NumSquaresX - 1 do
 		for j = 0, GameTableConfig.NumSquaresZ - 1 do
 			local squarePart = Instance.new("Part")
@@ -143,18 +149,21 @@ function GameTable.new(position:Vector2)
 			squarePart.Material = Enum.Material.SmoothPlastic
 			squarePart.Position = table.tableTop.Position + Vector3.new(
 				(-GameTableConfig.NumSquaresX / 2 + 0.5 + i) * squareSize + (i - (GameTableConfig.NumSquaresX - 1) / 2) * squareSpacing,
-				0.1,
+				table.tableTop.Size.Y/2 + squarePart.Size.Y/2,
 				(-GameTableConfig.NumSquaresZ / 2 + 0.5 + j) * squareSize + (j - (GameTableConfig.NumSquaresZ - 1) / 2) * squareSpacing
 			)
 			if i < GameTableConfig.NumSquaresX / 2 then
 				squarePart.Color = Color3.new(1, 0.349, 0.349) -- color for player 1 side
+				playerOneSquares[#playerOneSquares+1] = squarePart
 			else
 				squarePart.Color = Color3.new(0.0157, 0.686, 0.925) -- color for player 2 side
+				playerTwoSquares[#playerTwoSquares+1] = squarePart
 			end
 			squarePart.Parent = table
 		end
 	end
-
+	self.playerOneSquares = playerOneSquares
+	self.playerTwoSquares = playerTwoSquares
 
 	-- Parenting Table and Chairs to Workspace --
 	self.table = table
@@ -221,9 +230,8 @@ function GameTable:CheckAndStartCountdown()
         -- Countdown finished → start the actual game!
         self.playerSign.Text = ""
 		self.winMoneySign.Text = ""
-        -- TODO: Your game logic here (deal cards, start round, etc.)
-        -- e.g. self:StartGame()
-
+ 
+		-- Get the players sitting in the chairs --
 		local players = {}
 		for chairNumber, chair in pairs(self.tableChairs) do
 			local seat = chair:WaitForChild("Seat")
@@ -235,18 +243,59 @@ function GameTable:CheckAndStartCountdown()
 
 		end
 
+		-- Verify player count --
 		if #players < requiredPlayers then
 			print("Not enough players to start the game.")
 			self.isCountingDown = false
 			return
 		end
 
+		-- Set camera for each player to show them the table --
 		for i = 1, requiredPlayers do
+			ShowLeaveFrame:FireClient(players[i], false) -- Make the leave button visible for the player
 			local camCFrame = self:GetTableCameraCFrame()
 			ShowInitCamView:FireClient(players[i], camCFrame)  -- set cam for ith player
 		end
 		
 		-- drop the food on server
+		-- TODO: add code to spawn the player's own selected food
+		-- TODO: check if tween time of food needs to be greater than tween time of camera movement (might be better to wait for camera tween to finish before dropping food)
+		local tweens = {}
+		for _, part in self.playerOneSquares do
+			local food = Instance.new("Part")
+			food.Size = Vector3.new(0.5, 0.5, 0.5)
+			local spawnLocation = part.Position + Vector3.new(0, part.Size.Y/2 + food.Size.Y/2, 0) + Vector3.new(0, 3, 0)
+			food.Anchored = true
+			food.Position = spawnLocation
+			food.Parent = workspace
+			local tween = TweenService:Create(food, tweenInfo, {Position = part.Position + Vector3.new(0, part.Size.Y/2 + food.Size.Y/2, 0)})
+			table.insert(tweens, tween)
+		end
+
+		for _, part in self.playerTwoSquares do
+			local food = Instance.new("Part")
+			food.Size = Vector3.new(0.5, 0.5, 0.5)
+			local spawnLocation = part.Position + Vector3.new(0, part.Size.Y/2 + food.Size.Y/2, 0) + Vector3.new(0, 3, 0)
+			food.Anchored = true
+			food.Position = spawnLocation
+			food.Parent = workspace
+			local tween = TweenService:Create(food, tweenInfo, {Position = part.Position + Vector3.new(0, part.Size.Y/2 + food.Size.Y/2, 0)})
+			table.insert(tweens, tween)
+		end
+
+		local completedCount = 0
+		local totalTweens = #tweens
+
+		for _, tween in ipairs(tweens) do
+			tween.Completed:Connect(function()
+				completedCount += 1
+				if completedCount >= totalTweens then
+					print("ALL tweens finished! Proceeding...")
+					-- e.g. self:StartGame() or reset camera
+				end
+			end)
+			tween:Play()  -- Still all at once
+		end
 
 		-- wait until all food has been dropped then fireclient to set cam to different view 
 

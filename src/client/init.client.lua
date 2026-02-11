@@ -24,8 +24,8 @@ leaveButton.Activated:Connect(function()
     camera.CameraType = Enum.CameraType.Custom
 end)
 
-ShowLeaveFrame.OnClientEvent:Connect(function()
-    leaveFrame.Visible = true
+ShowLeaveFrame.OnClientEvent:Connect(function(bool)
+    leaveFrame.Visible = bool
 end)
 
 ShowInitCamView.OnClientEvent:Connect(function(camCFrame)
