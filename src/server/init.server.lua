@@ -10,6 +10,11 @@ local ShowInitCamView = Instance.new("RemoteEvent")
 ShowInitCamView.Name = "ShowInitCamView"
 ShowInitCamView.Parent = ReplicatedStorage
 
+-- Remote Functions --
+local CreateClickDetectors = Instance.new("RemoteFunction")
+CreateClickDetectors.Name = "CreateClickDetectors"
+CreateClickDetectors.Parent = ReplicatedStorage
+
 
 -- CallBacks for RemoteEvents --
 ShowLeaveFrame.OnServerEvent:Connect(function(player)

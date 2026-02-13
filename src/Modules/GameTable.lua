@@ -7,6 +7,7 @@ local chairs = models:WaitForChild("Chairs")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ShowLeaveFrame = ReplicatedStorage:WaitForChild("ShowLeaveFrame")
 local ShowInitCamView = ReplicatedStorage:WaitForChild("ShowInitCamView")
+local CreateClickDetectors = ReplicatedStorage:WaitForChild("CreateClickDetectors")
 local Configs = require(ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild("Configs"))
 local GameTableConfig = Configs.GameTable
 
@@ -20,6 +21,9 @@ function GameTable.new(position:Vector2)
 	local self = setmetatable({}, GameTable)
 	self.numPlayers = 0
 	self.isCountingDown = false
+	self.playerOneFoods = {}
+	self.playerTwoFoods = {}
+	self.requiredPlayers = 1
 
 	-- Setting up Table and Chairs --
 	local table = tables:FindFirstChild("Default"):Clone()
@@ -153,11 +157,11 @@ function GameTable.new(position:Vector2)
 				(-GameTableConfig.NumSquaresZ / 2 + 0.5 + j) * squareSize + (j - (GameTableConfig.NumSquaresZ - 1) / 2) * squareSpacing
 			)
 			if i < GameTableConfig.NumSquaresX / 2 then
-				squarePart.Color = Color3.new(1, 0.349, 0.349) -- color for player 1 side
-				playerOneSquares[#playerOneSquares+1] = squarePart
-			else
-				squarePart.Color = Color3.new(0.0157, 0.686, 0.925) -- color for player 2 side
+				squarePart.Color = Color3.new(0.0157, 0.686, 0.925)-- color for player 2 side
 				playerTwoSquares[#playerTwoSquares+1] = squarePart
+			else
+				squarePart.Color = Color3.new(1, 0.349, 0.349)  -- color for player 1 side
+				playerOneSquares[#playerOneSquares+1] = squarePart
 			end
 			squarePart.Parent = table
 		end
@@ -176,7 +180,6 @@ function GameTable.new(position:Vector2)
 end
 
 function GameTable:ChairPromptCallback(player:Player, chairNumber:number)
-
 	local character = player.Character or player.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid.Sit then
@@ -191,13 +194,20 @@ function GameTable:ChairPromptCallback(player:Player, chairNumber:number)
 end
 
 
-function GameTable:GetChairCameraCFrame(chairNum)
-    local chair = self.tableChairs[chairNum]
-    local seatPos = chair.Seat.Position
-    return CFrame.lookAt(
-        seatPos + Vector3.new(0, 2, 5),  -- Cam pos (behind/up)
-        seatPos + Vector3.new(0, 1, 0)   -- Look at seat center
-    )
+function GameTable:GetPlayerTableCFrame(chairNum)
+	-- chair number is either 1 or 2, depending on which chair the player is sitting in --
+	-- 1 is positive x direction, 2 is negative x direction --
+    local table = self.table
+	local tablePos = table.tableTop.Position
+	local xOffsetSign = -1
+	if chairNum == 1 then
+		xOffsetSign = 1
+	end
+	local rotationAngle = math.rad(-90)
+	return CFrame.lookAt(
+		tablePos + Vector3.new(xOffsetSign * 2, 3, 0),
+		tablePos + Vector3.new(xOffsetSign * 2, 0, 0)                  
+	) * CFrame.Angles(0, 0, rotationAngle) 
 end
 
 function GameTable:GetTableCameraCFrame()
@@ -210,13 +220,12 @@ function GameTable:GetTableCameraCFrame()
 end
 
 function GameTable:CheckAndStartCountdown()
-	local requiredPlayers = 1
-	print("Current Players: " .. self.numPlayers .. "/" .. requiredPlayers)
-    if self.numPlayers >= requiredPlayers and not self.isCountingDown then
+	print("Current Players: " .. self.numPlayers .. "/" .. self.requiredPlayers)
+    if self.numPlayers >= self.requiredPlayers and not self.isCountingDown then
         self.isCountingDown = true
 
         for i = 5, 0, -1 do
-            if self.numPlayers < requiredPlayers then
+            if self.numPlayers < self.requiredPlayers then
                 print("Countdown aborted - player left!")
                 self.isCountingDown = false
                 self.playerSign.Text = tostring(self.numPlayers) .. "/2 Players"
@@ -230,6 +239,7 @@ function GameTable:CheckAndStartCountdown()
         -- Countdown finished → start the actual game!
         self.playerSign.Text = ""
 		self.winMoneySign.Text = ""
+		self.isCountingDown = false
  
 		-- Get the players sitting in the chairs --
 		local players = {}
@@ -240,18 +250,18 @@ function GameTable:CheckAndStartCountdown()
 				local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
 				table.insert(players, player)
 			end
-
 		end
 
 		-- Verify player count --
-		if #players < requiredPlayers then
+		if #players < self.requiredPlayers then
 			print("Not enough players to start the game.")
 			self.isCountingDown = false
+			-- TODO: remove remaining player from seat and award him money --
 			return
 		end
 
 		-- Set camera for each player to show them the table --
-		for i = 1, requiredPlayers do
+		for i = 1, self.requiredPlayers do
 			ShowLeaveFrame:FireClient(players[i], false) -- Make the leave button visible for the player
 			local camCFrame = self:GetTableCameraCFrame()
 			ShowInitCamView:FireClient(players[i], camCFrame)  -- set cam for ith player
@@ -259,8 +269,9 @@ function GameTable:CheckAndStartCountdown()
 		
 		-- drop the food on server
 		-- TODO: add code to spawn the player's own selected food
-		-- TODO: check if tween time of food needs to be greater than tween time of camera movement (might be better to wait for camera tween to finish before dropping food)
+		-- TODO: probably need to add a remote function to retrieve the player's selected food from the client
 		local tweens = {}
+		local playerOneFoods = {}
 		for _, part in self.playerOneSquares do
 			local food = Instance.new("Part")
 			food.Size = Vector3.new(0.5, 0.5, 0.5)
@@ -270,8 +281,11 @@ function GameTable:CheckAndStartCountdown()
 			food.Parent = workspace
 			local tween = TweenService:Create(food, tweenInfo, {Position = part.Position + Vector3.new(0, part.Size.Y/2 + food.Size.Y/2, 0)})
 			table.insert(tweens, tween)
+			table.insert(playerOneFoods, food)
 		end
+		self.playerOneFoods = playerOneFoods
 
+		local playerTwoFoods = {}
 		for _, part in self.playerTwoSquares do
 			local food = Instance.new("Part")
 			food.Size = Vector3.new(0.5, 0.5, 0.5)
@@ -281,7 +295,9 @@ function GameTable:CheckAndStartCountdown()
 			food.Parent = workspace
 			local tween = TweenService:Create(food, tweenInfo, {Position = part.Position + Vector3.new(0, part.Size.Y/2 + food.Size.Y/2, 0)})
 			table.insert(tweens, tween)
+			table.insert(playerTwoFoods, food)
 		end
+		self.playerTwoFoods = playerTwoFoods
 
 		local completedCount = 0
 		local totalTweens = #tweens
@@ -291,18 +307,53 @@ function GameTable:CheckAndStartCountdown()
 				completedCount += 1
 				if completedCount >= totalTweens then
 					print("ALL tweens finished! Proceeding...")
-					-- e.g. self:StartGame() or reset camera
+					self:StartGame()
 				end
 			end)
 			tween:Play()  -- Still all at once
+		end		
+    end
+end
+
+function GameTable:StartGame()
+	-- Change the camera for each player to show them their own side of the table --
+	local players = {}
+	for chairNumber, chair in pairs(self.tableChairs) do
+		local seat = chair:WaitForChild("Seat")
+		if seat.Occupant ~= nil then
+			local occupantHumanoid = seat.Occupant
+			local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
+			local desiredChariNumber = 1
+			if chairNumber == 1 then
+				desiredChariNumber = 2
+			end
+			local camCFrame = self:GetPlayerTableCFrame(desiredChariNumber)
+			ShowInitCamView:FireClient(player, camCFrame)  -- set cam for ith player
+			players[chairNumber] = player
+			print("Player " .. player.Name .. " is sitting in chair " .. chairNumber)
+		end
+	end
+
+	local playerCount = 0
+    for _ in pairs(players) do
+        playerCount += 1 -- Roblox Lua supports +=
+    end
+
+	-- Verify player count --
+		if playerCount < self.requiredPlayers then
+			print("Not enough players to start the game.")
+			self.isCountingDown = false
+			-- TODO: remove remaining player from seat and award him money --
+			return
 		end
 
-		-- wait until all food has been dropped then fireclient to set cam to different view 
-
-
-        self.isCountingDown = false
-		
-    end
+	for playerNumber, player in pairs(players) do	
+		if playerNumber == 1 then
+			CreateClickDetectors:InvokeClient(player, self.playerTwoFoods)
+		else
+			CreateClickDetectors:InvokeClient(player, self.playerOneFoods) 
+		end
+	end
 end
 
 return GameTable

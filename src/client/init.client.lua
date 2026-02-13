@@ -2,6 +2,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ShowLeaveFrame = ReplicatedStorage:WaitForChild("ShowLeaveFrame")
 local ShowInitCamView = ReplicatedStorage:WaitForChild("ShowInitCamView")
+local CreateClickDetectors = ReplicatedStorage:WaitForChild("CreateClickDetectors")
 
 -- Services --
 local TweenService = game:GetService("TweenService")
@@ -44,3 +45,13 @@ ShowInitCamView.OnClientEvent:Connect(function(camCFrame)
         ShowInitCamView:FireServer("CameraReady")
     end)
 end)
+
+CreateClickDetectors.OnClientInvoke = function(parts)
+    local clickDetectors = {}
+    for _, part in pairs(parts) do
+        local clickDetector = Instance.new("ClickDetector")
+        clickDetector.Parent = part
+        table.insert(clickDetectors, clickDetector)
+    end
+    return true
+end
