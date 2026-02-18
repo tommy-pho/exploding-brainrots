@@ -29,12 +29,32 @@ function GameTable.new(position:Vector2)
 	local table = tables:FindFirstChild("Default"):Clone()
 	local playerOneChair = chairs:FindFirstChild('Default'):Clone()
 	local playerTwoChair = chairs:FindFirstChild('Default'):Clone()
+	local seatOne = Instance.new("Seat")
+	local seatTwo = Instance.new("Seat")
+	seatOne.Disabled = true
+	seatTwo.Disabled = true
+	seatOne.Size = Vector3.new(1, 0.2, 1)
+	seatTwo.Size = Vector3.new(1, 0.2, 1)
+	seatOne.CanCollide = false
+	seatTwo.CanCollide = false
+	seatOne.CastShadow = false
+	seatTwo.CastShadow = false
+	seatOne.Transparency = 0
+	seatTwo.Transparency = 0
 
-	table:PivotTo(CFrame.new(Vector3.new(position.X, GameTableConfig.TableHeight, position.Y)))
+	local tablePosition = Vector3.new(position.X, GameTableConfig.TableHeight, position.Y)
+	local rotationCFrame = CFrame.Angles(0, math.rad(GameTableConfig.TableRotY), 0)  -- e.g., angleDeg = 45 for 45°
+	local fullCFrame = CFrame.new(tablePosition) * rotationCFrame  -- Position * Rotation
+	table:PivotTo(fullCFrame)
 	local tablePosition = table:GetPivot().Position
 	playerOneChair:PivotTo(CFrame.new(Vector3.new(tablePosition.X + GameTableConfig.ChairOffsetX, GameTableConfig.ChairHeight, tablePosition.Z + GameTableConfig.ChairOffsetZ)))
 	playerTwoChair:PivotTo(CFrame.new(Vector3.new(tablePosition.X - GameTableConfig.ChairOffsetX, GameTableConfig.ChairHeight, tablePosition.Z + GameTableConfig.ChairOffsetZ)))
-	
+	seatOne:PivotTo(CFrame.new(Vector3.new(tablePosition.X + GameTableConfig.ChairOffsetX, GameTableConfig.SeatOffsetY, tablePosition.Z + GameTableConfig.ChairOffsetZ)))
+	seatTwo:PivotTo(CFrame.new(Vector3.new(tablePosition.X - GameTableConfig.ChairOffsetX, GameTableConfig.SeatOffsetY, tablePosition.Z + GameTableConfig.ChairOffsetZ)))
+	seatOne.Anchored = true
+	seatTwo.Anchored = true
+
+
 	local rotationCFrame = CFrame.Angles(0, math.rad(GameTableConfig.ChairRotY), 0)  -- e.g., angleDeg = 45 for 45°
 	local fullCFrame = CFrame.new(playerOneChair:GetPivot().Position) * rotationCFrame  -- Position * Rotation
 	playerOneChair:PivotTo(fullCFrame)
@@ -74,12 +94,13 @@ function GameTable.new(position:Vector2)
 	ProximityPrompt.Parent = playerTwoChair:WaitForChild("Seat")
 
 	local tableChairs = {playerOneChair, playerTwoChair}
+	local seats = {seatOne, seatTwo}
 	self.tableChairs = tableChairs
+	self.seats = seats
 	self.chairPrompts = chairPrompts
 
 	-- Setting up Seat Occupant Changed Callbacks --
-	for chairNumber, chair in pairs(tableChairs) do
-		local seat = chair:WaitForChild("Seat")
+	for chairNumber, seat in pairs(self.seats) do
 		seat:GetPropertyChangedSignal("Occupant"):Connect(function()
 			if not seat.Occupant then
 				-- A player has left the seat
@@ -135,9 +156,10 @@ function GameTable.new(position:Vector2)
 	self.winMoneySign = textLabel
 
 	-- Adding Squares on Top of Table --
-	local squareSpacing = 0.1
+	print("TableTop Size: " .. tostring(tableTop.Size))
+	local squareSpacing = 0.5
 	local squaresizeX = 0.85 * (table.tableTop.Size.X - squareSpacing * (GameTableConfig.NumSquaresX - 1)) / GameTableConfig.NumSquaresX
-	local squaresizeZ = 0.90 * (table.tableTop.Size.Z - squareSpacing * (GameTableConfig.NumSquaresZ - 1)) / GameTableConfig.NumSquaresZ
+	local squaresizeZ = 0.95 * (table.tableTop.Size.Z - squareSpacing * (GameTableConfig.NumSquaresZ - 1)) / GameTableConfig.NumSquaresZ
 	local squareSize = math.min(squaresizeX, squaresizeZ)
 	local playerOneSquares = {}
 	local playerTwoSquares = {}
@@ -157,10 +179,10 @@ function GameTable.new(position:Vector2)
 				(-GameTableConfig.NumSquaresZ / 2 + 0.5 + j) * squareSize + (j - (GameTableConfig.NumSquaresZ - 1) / 2) * squareSpacing
 			)
 			if i < GameTableConfig.NumSquaresX / 2 then
-				squarePart.Color = Color3.new(0.0157, 0.686, 0.925)-- color for player 2 side
+				squarePart.Color = Color3.fromRGB(4, 175, 236)-- color for player 2 side
 				playerTwoSquares[#playerTwoSquares+1] = squarePart
 			else
-				squarePart.Color = Color3.new(1, 0.349, 0.349)  -- color for player 1 side
+				squarePart.Color = Color3.fromRGB(196, 40, 28)  -- color for player 1 side
 				playerOneSquares[#playerOneSquares+1] = squarePart
 			end
 			squarePart.Parent = table
@@ -176,6 +198,10 @@ function GameTable.new(position:Vector2)
 		chair.Parent = workspace
 	end
 
+	for _, seat in pairs(seats) do
+		seat.Parent = workspace
+	end
+
 	return self
 end
 
@@ -187,10 +213,10 @@ function GameTable:ChairPromptCallback(player:Player, chairNumber:number)
 		return
 	end
 
-	local Seat = self.tableChairs[chairNumber]:WaitForChild("Seat")
+	local seat = self.seats[chairNumber]
 	humanoid.JumpHeight = 0  -- Disable jumping
 	humanoid.JumpPower = 0  -- Disable jumping
-	Seat:Sit(humanoid) -- Make the player sit in the seat
+	seat:Sit(humanoid) -- Make the player sit in the seat
 end
 
 
@@ -205,7 +231,7 @@ function GameTable:GetPlayerTableCFrame(chairNum)
 	end
 	local rotationAngle = math.rad(-90)
 	return CFrame.lookAt(
-		tablePos + Vector3.new(xOffsetSign * 2, 3, 0),
+		tablePos + Vector3.new(xOffsetSign * 2, 4, 0),
 		tablePos + Vector3.new(xOffsetSign * 2, 0, 0)                  
 	) * CFrame.Angles(0, 0, rotationAngle) 
 end
@@ -243,8 +269,7 @@ function GameTable:CheckAndStartCountdown()
  
 		-- Get the players sitting in the chairs --
 		local players = {}
-		for chairNumber, chair in pairs(self.tableChairs) do
-			local seat = chair:WaitForChild("Seat")
+		for chairNumber, seat in pairs(self.seats) do
 			if seat.Occupant ~= nil then
 				local occupantHumanoid = seat.Occupant
 				local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
@@ -318,16 +343,15 @@ end
 function GameTable:StartGame()
 	-- Change the camera for each player to show them their own side of the table --
 	local players = {}
-	for chairNumber, chair in pairs(self.tableChairs) do
-		local seat = chair:WaitForChild("Seat")
+	for chairNumber, seat in pairs(self.seats) do
 		if seat.Occupant ~= nil then
 			local occupantHumanoid = seat.Occupant
 			local player = game.Players:GetPlayerFromCharacter(occupantHumanoid.Parent)
-			local desiredChariNumber = 1
+			local desiredChairNumber = 1
 			if chairNumber == 1 then
-				desiredChariNumber = 2
+				desiredChairNumber = 2
 			end
-			local camCFrame = self:GetPlayerTableCFrame(desiredChariNumber)
+			local camCFrame = self:GetPlayerTableCFrame(desiredChairNumber)
 			ShowInitCamView:FireClient(player, camCFrame)  -- set cam for ith player
 			players[chairNumber] = player
 			print("Player " .. player.Name .. " is sitting in chair " .. chairNumber)

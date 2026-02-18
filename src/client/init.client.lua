@@ -19,10 +19,17 @@ local leaveFrame = screenGui:WaitForChild("LeaveFrame")
 local leaveButton = leaveFrame:WaitForChild("TextButton")
 leaveFrame.Visible = false
 
+-- On Respawn Player Should Reset Camera --
+player.CharacterAdded:Connect(function(character)
+    camera.CameraType = Enum.CameraType.Custom
+    camera.CameraSubject = character:FindFirstChildOfClass("Humanoid")
+end)
+
 leaveButton.Activated:Connect(function()
     leaveFrame.Visible = false
     ShowLeaveFrame:FireServer()
     camera.CameraType = Enum.CameraType.Custom
+    camera.CameraSubject = player.Character:FindFirstChildOfClass("Humanoid")
 end)
 
 ShowLeaveFrame.OnClientEvent:Connect(function(bool)
